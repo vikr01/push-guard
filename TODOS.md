@@ -44,7 +44,7 @@ The binary is the runtime. Behaviors are packages distributed from a registry.
 - [ ] `push-guard uninstall <package>` — remove a hook behavior
 - [ ] `push-guard update` — update all installed hook behaviors
 - [ ] Extract the current git-push-guard logic into a first-party WASM hook package
-      (`@push-guard/git`) published to the registry
+      (`git-push-guard`) published to the registry
 - [ ] Registry server — stores and serves WASM hook packages
 - [ ] `push-guard install-claude-hook` — writes the `push-guard hook` entry to
       `~/.claude/settings.json` automatically; no manual config needed
