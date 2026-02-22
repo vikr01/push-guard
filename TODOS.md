@@ -4,14 +4,16 @@
 
 ## Phase 0 — Core (complete)
 
-- [x] `check` — exits 0 (allow) or 1 (block); hook converts 1 → exit 2 for Claude Code soft block
+- [x] `hook` — Claude Code PreToolUse entry point; reads stdin JSON, handles all git
+      interception in Rust; no shell script intermediary
+- [x] `check` — exits 0 (allow) or 1 (block)
 - [x] `track` — mark a branch as Claude-created
 - [x] `authorize` — grant one-time push authorization to a branch
 - [x] `revoke` — revoke a previously granted authorization
 - [x] `list` — show all tracked and authorized branches
 - [x] State persisted at `~/.local/share/push-guard/state.json`
-- [x] Hook script: auto-tracks on `git checkout -b` / `git switch -c`; delegates all push
-      decisions to push-guard; falls back gracefully if push-guard not installed
+- [x] Claude Code settings.json points directly to the binary (`push-guard hook`);
+      no shell script
 
 ---
 
@@ -29,12 +31,25 @@
 
 ---
 
-## Phase 2 — Hook improvements
+## Phase 2 — Registry
 
-- [ ] Ship the hook script as part of the crate — `push-guard install-hook` command that
-      writes the hook to `~/.claude/hooks/block-main-push.sh` and sets +x
-- [ ] `push-guard uninstall-hook` — remove the hook
-- [ ] Detect hook version mismatch — warn if installed hook is older than current push-guard
+Hook behaviors should be installable packages, not hardcoded into the binary.
+The binary is the runtime. Behaviors are packages distributed from a registry.
+
+- [ ] Define hook package format — a WASM module that exports:
+      `fn handle(tool: &str, command: &str) -> HookResult`
+      where `HookResult` is allow / block(message) / track-branch(name)
+- [ ] Embed wasmtime — execute hook behavior WASM modules
+- [ ] `push-guard install <package>` — download and register a hook behavior from the registry
+- [ ] `push-guard uninstall <package>` — remove a hook behavior
+- [ ] `push-guard update` — update all installed hook behaviors
+- [ ] Extract the current git-push-guard logic into a first-party WASM hook package
+      (`@push-guard/git`) published to the registry
+- [ ] Registry server — stores and serves WASM hook packages
+- [ ] `push-guard install-claude-hook` — writes the `push-guard hook` entry to
+      `~/.claude/settings.json` automatically; no manual config needed
+- [ ] `push-guard uninstall-claude-hook` — removes the entry from settings.json
+- [ ] Detect version mismatch between installed binary and registered hook packages
 
 ---
 
