@@ -29,6 +29,8 @@ enum Commands {
         #[arg(long)]
         repo: String,
         #[arg(long)]
+        remote: String,
+        #[arg(long)]
         branch: String,
         #[arg(long, default_value = "false")]
         force: bool,
@@ -65,9 +67,8 @@ enum Commands {
     },
 }
 
-const PROTECTED: &[&str] = &["main", "master", "trunk", "develop"];
-
 struct PushInfo {
+    remote: String,
     branch: String,
     force: bool,
 }
@@ -94,12 +95,14 @@ fn detect_branch_creation(command: &str) -> Option<String> {
                             || t.starts_with("-C")
                     });
                     if creates {
-                        // Branch name is the last non-flag token
-                        return rest.iter().filter(|t| !t.starts_with('-')).last().map(|s| s.to_string());
+                        return rest
+                            .iter()
+                            .filter(|t| !t.starts_with('-'))
+                            .last()
+                            .map(|s| s.to_string());
                     }
                 }
                 "branch" => {
-                    // git branch <name> — track it even though it doesn't switch
                     return tokens[i + 2..]
                         .iter()
                         .find(|t| !t.starts_with('-'))
@@ -138,23 +141,19 @@ fn parse_push_args(args: &[&str]) -> PushInfo {
             "--force" | "-f" | "--force-with-lease" | "--force-if-includes" => {
                 force = true;
             }
-            // Flags that take a value argument
             "-o" | "--push-option" | "--receive-pack" | "--exec" => {
-                i += 1; // skip value
+                i += 1; // these flags take a value, skip it
             }
-            a if a.starts_with('-') => {
-                // Other flags (--tags, --all, -u, --set-upstream, etc.) — no value
-            }
-            _ => {
-                positional.push(arg);
-            }
+            a if a.starts_with('-') => {}
+            _ => positional.push(arg),
         }
         i += 1;
     }
 
-    // positional[0] = remote, positional[1] = branch (or refspec)
+    let remote = positional.first().unwrap_or(&"origin").to_string();
+
     let branch = positional.get(1).map(|s| {
-        // Handle refspecs like HEAD:main or feature:main
+        // Handle refspecs: HEAD:main, feature:main — take the destination side
         if let Some(colon) = s.find(':') {
             s[colon + 1..].to_string()
         } else {
@@ -162,10 +161,10 @@ fn parse_push_args(args: &[&str]) -> PushInfo {
         }
     });
 
-    // If no explicit branch, look up current tracking branch
+    // No explicit branch — look up what the current branch tracks on this remote
     let branch = branch.unwrap_or_else(|| get_current_branch().unwrap_or_default());
 
-    PushInfo { branch, force }
+    PushInfo { remote, branch, force }
 }
 
 // ── Git helpers ──────────────────────────────────────────────────────────────
@@ -188,9 +187,49 @@ fn get_current_branch() -> Option<String> {
         .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
 }
 
+/// Resolves the actual default branch of a remote — what the remote's HEAD points to.
+/// Does not rely on branch name conventions.
+///
+/// Strategy:
+///   1. `git symbolic-ref refs/remotes/<remote>/HEAD` — local, instant, works after fetch
+///   2. `git remote show <remote>` — makes a network call, always accurate
+///   3. None — caller decides what to do
+fn get_default_branch(remote: &str) -> Option<String> {
+    // Try local ref first — fast, no network
+    let sym_ref = format!("refs/remotes/{}/HEAD", remote);
+    let output = Command::new("git")
+        .args(["symbolic-ref", &sym_ref, "--short"])
+        .output()
+        .ok()
+        .filter(|o| o.status.success())?;
+
+    let s = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if !s.is_empty() {
+        // Returns "<remote>/<branch>" — strip the remote prefix
+        return s
+            .strip_prefix(&format!("{}/", remote))
+            .map(|b| b.to_string());
+    }
+
+    // Fall back to network call
+    let output = Command::new("git")
+        .args(["remote", "show", remote])
+        .output()
+        .ok()
+        .filter(|o| o.status.success())?;
+
+    String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .find_map(|line| {
+            line.trim()
+                .strip_prefix("HEAD branch:")
+                .map(|b| b.trim().to_string())
+        })
+}
+
 // ── Authorization logic ──────────────────────────────────────────────────────
 
-fn check(repo: &str, branch: &str, force: bool) -> Result<()> {
+fn check(repo: &str, remote: &str, branch: &str, force: bool) -> Result<()> {
     if branch.is_empty() {
         std::process::exit(0);
     }
@@ -204,12 +243,17 @@ fn check(repo: &str, branch: &str, force: bool) -> Result<()> {
         std::process::exit(1);
     }
 
-    if PROTECTED.contains(&branch) {
+    // Determine whether this branch is the remote's actual default branch —
+    // not by name, but by where the remote's HEAD points.
+    let default_branch = get_default_branch(remote);
+    let is_default = default_branch.as_deref() == Some(branch);
+
+    if is_default {
         eprintln!(
-            "BLOCKED: '{}' is a protected branch.\n\
+            "BLOCKED: '{}' is the default branch of '{}'.\n\
              Recommendation: push to a feature branch instead.\n\
              To push to '{}' directly, say \"I authorize\".",
-            branch, branch
+            branch, remote, branch
         );
         std::process::exit(1);
     }
@@ -251,7 +295,6 @@ fn run_hook() -> Result<()> {
 
     let repo = get_repo_root().unwrap_or_else(|| "unknown".to_string());
 
-    // Branch creation — track and allow
     if let Some(branch) = detect_branch_creation(&command) {
         if let Ok(mut state) = State::load() {
             state.track(&repo, &branch);
@@ -260,9 +303,8 @@ fn run_hook() -> Result<()> {
         return Ok(());
     }
 
-    // Push — check authorization
     if let Some(push) = detect_push(&command) {
-        check(&repo, &push.branch, push.force)?;
+        check(&repo, &push.remote, &push.branch, push.force)?;
     }
 
     Ok(())
@@ -277,12 +319,11 @@ fn main() -> Result<()> {
         Commands::Hook => {
             if let Err(e) = run_hook() {
                 eprintln!("push-guard hook error: {}", e);
-                // Don't block on internal errors — let the command through
             }
         }
 
-        Commands::Check { repo, branch, force } => {
-            check(&repo, &branch, force)?;
+        Commands::Check { repo, remote, branch, force } => {
+            check(&repo, &remote, &branch, force)?;
         }
 
         Commands::Track { repo, branch } => {

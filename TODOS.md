@@ -17,6 +17,10 @@
 
 ## Phase 1 — Robustness
 
+- [x] Resolve protected branch by remote HEAD, not by name
+  - `git symbolic-ref refs/remotes/<remote>/HEAD` — local, fast
+  - Falls back to `git remote show <remote>` — network, always accurate
+  - Works regardless of what the default branch is named
 - [ ] Handle `git push origin HEAD:main` — refspec with colon
   - Currently extracts last token only
   - Refspec destination needs its own parse path
