@@ -15,22 +15,24 @@
 
 ---
 
-## Phase 1 — Robustness
+## Phase 1 — Robustness (complete)
 
 - [x] Resolve protected branch by remote HEAD, not by name
   - `git symbolic-ref refs/remotes/<remote>/HEAD` — local, fast
   - Falls back to `git remote show <remote>` — network, always accurate
   - Works regardless of what the default branch is named
-- [ ] Handle `git push origin HEAD:main` — refspec with colon
-  - Currently extracts last token only
-  - Refspec destination needs its own parse path
-- [ ] Handle `git push` with no remote or branch
-  - Look up tracking branch via `git rev-parse --abbrev-ref @{u}`
-- [ ] Handle multiple chained push commands
-  - `&&` and `;` — check each independently, not just the first
-- [ ] `--dry-run` flag on `check` — print decision without side effects
-- [ ] Tests
+- [x] Handle `git push origin HEAD:main` — refspec with colon
+  - Extracts destination side of refspec
+- [x] Handle `git push` with no remote or branch
+  - Looks up tracking branch via `git rev-parse --abbrev-ref @{u}`
+  - Falls back to current branch + origin if no upstream configured
+- [x] Handle multiple chained push commands
+  - `&&` and `;` — each push checked independently
+  - Each branch creation tracked independently
+- [x] `--dry-run` flag on `check` — prints decision without exiting non-zero
+- [x] Tests
   - Unit: `state.rs` — track, authorize, revoke, is_tracked, is_authorized, deduplication
+  - Unit: `main.rs` — parse_push_args, detect_branch_creations, detect_all_pushes
   - Integration: check exit codes for each authorization scenario
 
 ---
@@ -52,12 +54,12 @@
 
 ---
 
-## Phase 3 — UX
+## Phase 3 — UX (complete)
 
-- [ ] `--json` output flag on `list` — machine-readable output
-- [ ] `push-guard clean --repo <path>` — remove all entries for a repo
-- [ ] `push-guard clean --stale` — remove entries for repos no longer on disk
-- [ ] Color output — green (allowed), red (blocked), yellow (warnings)
+- [x] `--json` output flag on `list` — machine-readable output
+- [x] `push-guard clean --repo <path>` — remove all entries for a repo
+- [x] `push-guard clean --stale` — remove entries for repos no longer on disk
+- [x] Color output — green (claude-tracked), yellow (authorized), red (blocked)
 
 ---
 
