@@ -1,18 +1,17 @@
-'use strict';
+import fs from 'fs';
+import path from 'path';
+import https from 'https';
+import stream from 'stream';
+import util from 'util';
+import { IncomingMessage } from 'http';
 
-var fs = require('fs');
-var path = require('path');
-var https = require('https');
-var stream = require('stream');
-var util = require('util');
+const pipe = util.promisify(stream.pipeline);
 
-var pipe = util.promisify(stream.pipeline);
+const VERSION: string = process.env.npm_package_version!;
+const REPO: string = new URL(process.env.npm_package_repository_url!).pathname.slice(1);
+const isWin: boolean = process.platform === 'win32';
 
-var VERSION = process.env.npm_package_version;
-var REPO = new URL(process.env.npm_package_repository_url).pathname.slice(1);
-var isWin = process.platform === 'win32';
-
-var TARGETS = {
+const TARGETS: Record<string, string> = {
   'darwin-arm64': 'push-guard-aarch64-apple-darwin',
   'darwin-x64':   'push-guard-x86_64-apple-darwin',
   'linux-arm64':  'push-guard-aarch64-unknown-linux-gnu',
@@ -20,23 +19,23 @@ var TARGETS = {
   'win32-x64':    'push-guard-x86_64-pc-windows-msvc',
 };
 
-var key = process.platform + '-' + process.arch;
-var target = TARGETS[key];
+const key: string = process.platform + '-' + process.arch;
+const target: string | undefined = TARGETS[key];
 
 if (!target) {
   console.error('push-guard: unsupported platform ' + key);
   process.exit(1);
 }
 
-var ext = isWin ? '.zip' : '.tar.xz';
-var url = 'https://github.com/' + REPO + '/releases/download/v' + VERSION + '/' + target + ext;
-var dest = path.join(__dirname, 'push-guard');
+const ext: string = isWin ? '.zip' : '.tar.xz';
+const url: string = 'https://github.com/' + REPO + '/releases/download/v' + VERSION + '/' + target + ext;
+const dest: string = path.join(__dirname, 'push-guard');
 
-function fetch(url) {
+function fetch(url: string): Promise<IncomingMessage> {
   return new Promise(function (resolve, reject) {
     https.get(url, function (res) {
       if (res.statusCode === 301 || res.statusCode === 302) {
-        fetch(res.headers.location).then(resolve, reject);
+        fetch(res.headers.location!).then(resolve, reject);
       } else if (res.statusCode !== 200) {
         reject(new Error('HTTP ' + res.statusCode));
       } else {
@@ -53,7 +52,7 @@ fetch(url)
   .then(function () {
     if (!isWin) fs.chmodSync(dest, 0o755);
   })
-  .catch(function (err) {
+  .catch(function (err: Error) {
     console.error('push-guard install failed:', err.message);
     process.exit(1);
   });
