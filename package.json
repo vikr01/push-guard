@@ -11,8 +11,8 @@
     "push-guard": "./push-guard"
   },
   "scripts": {
-    "build": "swc install.ts -o install.js",
-    "prepublishOnly": "npm run build",
+    "build": "bun build install.ts --target=node --format=cjs --outfile=install.js",
+    "prepublishOnly": "bun run build",
     "postinstall": "node install.js"
   },
   "files": [
@@ -22,8 +22,6 @@
     "node": ">=12"
   },
   "devDependencies": {
-    "@swc/cli": "^0.8.0",
-    "@swc/core": "^1.15.11",
     "@types/node": "^25.3.0"
   }
 }

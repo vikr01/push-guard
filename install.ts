@@ -29,7 +29,7 @@ if (!target) {
 
 const ext: string = isWin ? '.zip' : '.tar.xz';
 const url: string = 'https://github.com/' + REPO + '/releases/download/v' + VERSION + '/' + target + ext;
-const dest: string = path.join(__dirname, 'push-guard');
+const dest: string = path.join(path.dirname(process.argv[1]), 'push-guard');
 
 function fetch(url: string): Promise<IncomingMessage> {
   return new Promise(function (resolve, reject) {
