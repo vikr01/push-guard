@@ -1,0 +1,23 @@
+{
+  "name": "push-guard",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Git push authorization manager for Claude Code hooks",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vikr01/push-guard"
+  },
+  "bin": {
+    "push-guard": "./push-guard"
+  },
+  "scripts": {
+    "postinstall": "node install.mjs"
+  },
+  "files": [
+    "install.mjs"
+  ],
+  "engines": {
+    "node": ">=18"
+  }
+}
