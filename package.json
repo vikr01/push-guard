@@ -12,6 +12,7 @@
   },
   "scripts": {
     "build": "swc install.ts -o install.js",
+    "prepublishOnly": "npm run build",
     "postinstall": "node install.js"
   },
   "files": [
